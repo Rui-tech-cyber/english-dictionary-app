@@ -344,7 +344,29 @@ csv-parseの戻り値がunknown型になるため。
 
 ---
 
-## 10. 検索機能実装
+## 10. layout.tsx 日本語化・Font設定変更
+
+### 変更内容
+
+* `Inter` フォント（Google Fonts）を削除
+* `<html lang="en">` → `<html lang="ja">` に変更
+* メタデータを日本語アプリ向けに更新
+
+```tsx
+export const metadata: Metadata = {
+  title: "英語辞書",
+  description: "英語学習者向けWeb辞書アプリ",
+};
+```
+
+### 変更理由
+
+* フォント読み込みによる起動・描画のオーバーヘッド削減
+* 日本語ユーザー向けに `lang` 属性を適切に設定
+
+---
+
+## 11. 検索機能実装（API拡張）
 
 ### API拡張
 
@@ -359,7 +381,7 @@ csv-parseの戻り値がunknown型になるため。
 ### 検索ロジック
 
 ```ts
-const query = searchParams.get('q') || ''
+const query = request.nextUrl.searchParams.get('q') || ''
 ```
 
 ```ts
@@ -402,7 +424,7 @@ apple
 
 ---
 
-## 11. フロント側検索UI
+## 12. フロント側検索UI
 
 ### 状態管理
 
@@ -416,7 +438,7 @@ const [words, setWords] = useState([])
 ### API呼び出し
 
 ```ts
-const res = await fetch(`/api/words?q=${query}`)
+const res = await fetch(`/api/words?q=${encodeURIComponent(value)}`)
 ```
 
 ---
@@ -426,7 +448,8 @@ const res = await fetch(`/api/words?q=${query}`)
 ```tsx
 {words.map((word) => (
   <li key={word.id}>
-    {word.word}
+    {word.word} - {word.meaning}
+    {word.example && <span> ({word.example})</span>}
   </li>
 ))}
 ```
@@ -484,6 +507,70 @@ type WordCSV
 
 ---
 
+## layout.tsx コンパイルエラー（globals.css 型宣言不足）
+
+発生内容
+
+```text
+Cannot find module or type declarations for side-effect import of './globals.css'.
+```
+
+原因
+
+* TypeScript が CSS ファイルのサイドエフェクトインポートに対して型宣言を要求（TS2882）
+
+対応
+
+* `src/global.d.ts` を作成し `declare module '*.css' {}` を追加
+* 解決済み
+
+---
+
+## micromatch パッケージ破損
+
+発生内容
+
+```text
+Cannot find module '/...node_modules/micromatch/index.js'
+```
+
+原因
+
+* `node_modules/micromatch/` に `package.json` のみ残り `index.js` が欠落
+* `next/font` → `fast-glob` → `micromatch` の依存チェーンで起動時エラー
+
+対応
+
+* `node_modules/micromatch/` を削除後 `npm install` を再実行
+* `index.js` が復元され解決済み
+
+対応
+
+* `node_modules/micromatch/` を削除後 `npm install` を再実行
+* `index.js` が復元され解決済み
+* `npm run dev` 起動確認済み（Ready in 4.2s）
+
+---
+
+## iCloud Drive配下によるnode_modules同期問題
+
+発生内容
+
+* `npm run dev` の起動に非常に長い時間がかかる
+
+原因
+
+* プロジェクトが iCloud Drive 配下（`~/Library/Mobile Documents/com~apple~CloudDocs/`）に置かれていた
+* iCloud の自動同期が `node_modules` 以下の数万ファイルを対象とし、ファイルI/Oが著しく低下
+
+対応
+
+* プロジェクトを iCloud Drive 外の `/Users/nakamura/Projects/english-dictionary-app` へ移動
+* 移動後の起動時間を計測し、`Ready in 4.2s` を確認
+* 解決済み
+
+---
+
 ## 検索APIのレスポンスエラー
 
 発生内容
@@ -496,7 +583,11 @@ Unexpected end of JSON input
 
 * APIが正常なJSONを返却していない
 
-今後調査予定。
+対応
+
+* `NextRequest` を使用した実装に修正
+* フロント側で `encodeURIComponent` を使用するよう修正
+* 解決済み
 
 ---
 
@@ -511,7 +602,14 @@ Unexpected end of JSON input
 * Wordモデル作成
 * API作成
 * CSVインポート機能
-* 検索機能（実装中）
+* 検索機能（部分一致・日本語対応）
+* layout.tsx 日本語化・Font設定変更
+
+動作確認済み
+
+* `npm run dev` 起動確認（Ready in 4.2s）
+* HTTP 200 レスポンス確認済み
+* プロジェクトをiCloud Drive外へ移動し、起動速度問題を解消
 
 ---
 
@@ -519,11 +617,10 @@ Unexpected end of JSON input
 
 優先度高
 
-1. 検索機能不具合修正
-2. 単語詳細ページ
-3. 単語登録機能
-4. お気に入り機能
-5. 登録単語帳
+1. 単語詳細ページ
+2. 単語登録機能
+3. お気に入り機能
+4. 登録単語帳
 
 優先度中
 
